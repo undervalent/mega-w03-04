@@ -2,61 +2,146 @@ import { fetchIncidents, ack, acks } from './api.js';
 
 const empty = document.querySelector('[data-testid="empty"]');
 const list = document.querySelector('[data-testid="incident-list"]');
+const confirmModal = document.querySelector('[data-testid="confirm"]');
+const confirmMessage = document.getElementById('confirm-message');
+const confirmAckBtn = document.querySelector('[data-testid="confirm-ack"]');
+const confirmCancelBtn = document.querySelector('[data-testid="confirm-cancel"]');
 
 const ackedIds = new Set(acks.map((a) => a.id));
 const incidentMap = new Map();
+const domRowMap = new Map();
 
 function formatTime(isoString) {
   const date = new Date(isoString);
   return date.toLocaleString();
 }
 
+function createRowElement(inc) {
+  const row = document.createElement('li');
+  row.className = `row ${inc.severity}`;
+  row.dataset.testid = 'incident-row';
+  row.dataset.id = inc.id;
+
+  const isAcked = ackedIds.has(inc.id);
+  const ackHtml = isAcked
+    ? `<span data-testid="acked" class="acked">Acked</span>`
+    : `<button data-testid="ack" class="ack" data-id="${inc.id}">Ack</button>`;
+
+  row.innerHTML = `
+    <span class="id">${inc.id}</span>
+    <span class="sev">${inc.severity}</span>
+    <span class="what">${inc.service} · ${inc.region} · ${inc.summary}</span>
+    <time datetime="${inc.openedAt}">${formatTime(inc.openedAt)}</time>
+    ${ackHtml}
+  `;
+  return row;
+}
+
 function renderIncidents(incidents) {
   if (incidents.length === 0) {
-    list.style.display = 'none';
-    if (empty) empty.style.display = 'block';
+    if (domRowMap.size === 0) {
+      list.style.display = 'none';
+      if (empty) empty.style.display = 'block';
+    }
     return;
   }
 
   if (empty) empty.style.display = 'none';
   list.style.display = 'block';
 
-  list.innerHTML = incidents
-    .map((inc) => {
-      const isAcked = ackedIds.has(inc.id);
-      const ackHtml = isAcked
-        ? `<span data-testid="acked" class="acked">Acked</span>`
-        : `<button data-testid="ack" class="ack" data-id="${inc.id}">Ack</button>`;
+  // Incremental DOM update without removing existing rows
+  for (let i = 0; i < incidents.length; i++) {
+    const inc = incidents[i];
+    if (domRowMap.has(inc.id)) {
+      // Row already in DOM, update ack state if needed
+      const row = domRowMap.get(inc.id);
+      if (ackedIds.has(inc.id)) {
+        const btn = row.querySelector('[data-testid="ack"]');
+        if (btn) {
+          const ackedSpan = document.createElement('span');
+          ackedSpan.dataset.testid = 'acked';
+          ackedSpan.className = 'acked';
+          ackedSpan.textContent = 'Acked';
+          btn.replaceWith(ackedSpan);
+        }
+      }
+    } else {
+      // Create new row
+      const row = createRowElement(inc);
+      domRowMap.set(inc.id, row);
 
-      return `<li data-testid="incident-row" data-id="${inc.id}" class="row ${inc.severity}">
-        <span class="id">${inc.id}</span>
-        <span class="sev">${inc.severity}</span>
-        <span class="what">${inc.service} · ${inc.region} · ${inc.summary}</span>
-        <time datetime="${inc.openedAt}">${formatTime(inc.openedAt)}</time>
-        ${ackHtml}
-      </li>`;
-    })
-    .join('');
+      // Find insertion point (the next incident in list that is already in DOM)
+      let nextElement = null;
+      for (let j = i + 1; j < incidents.length; j++) {
+        const nextId = incidents[j].id;
+        if (domRowMap.has(nextId)) {
+          nextElement = domRowMap.get(nextId);
+          break;
+        }
+      }
+
+      if (nextElement && nextElement.parentNode === list) {
+        list.insertBefore(row, nextElement);
+      } else {
+        list.appendChild(row);
+      }
+    }
+  }
 }
 
-list.addEventListener('click', async (e) => {
+let pendingAckId = null;
+let pendingAckRow = null;
+
+list.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-testid="ack"]');
   if (!btn) return;
   const id = btn.dataset.id;
   if (!id) return;
 
-  btn.disabled = true;
+  const row = btn.closest('[data-testid="incident-row"]');
+  pendingAckId = id;
+  pendingAckRow = row;
+
+  confirmMessage.textContent = `Acknowledge incident ${id}?`;
+  confirmModal.style.display = 'flex';
+});
+
+confirmCancelBtn.addEventListener('click', () => {
+  confirmModal.style.display = 'none';
+  pendingAckId = null;
+  pendingAckRow = null;
+});
+
+confirmAckBtn.addEventListener('click', async () => {
+  if (!pendingAckId || !pendingAckRow) return;
+  const id = pendingAckId;
+  const row = pendingAckRow;
+  confirmModal.style.display = 'none';
+  pendingAckId = null;
+  pendingAckRow = null;
+
+  const btn = row.querySelector('[data-testid="ack"]');
+  if (btn) btn.disabled = true;
+
   try {
     await ack(id);
     ackedIds.add(id);
-    const ackedSpan = document.createElement('span');
-    ackedSpan.dataset.testid = 'acked';
-    ackedSpan.className = 'acked';
-    ackedSpan.textContent = 'Acked';
-    btn.replaceWith(ackedSpan);
+    if (btn) {
+      const ackedSpan = document.createElement('span');
+      ackedSpan.dataset.testid = 'acked';
+      ackedSpan.className = 'acked';
+      ackedSpan.textContent = 'Acked';
+      btn.replaceWith(ackedSpan);
+    }
   } catch (err) {
     console.error(`Failed to ack ${id}:`, err);
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && confirmModal.style.display !== 'none') {
+    confirmCancelBtn.click();
   }
 });
 

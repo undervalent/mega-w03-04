@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="build" content="9c0566a" />
+    <meta name="build" content="BUILD_SHA_PLACEHOLDER" />
     <title>sched-prod · incidents</title>
     <link rel="stylesheet" href="style.css" />
     <script type="module" src="app.js"></script>
@@ -18,6 +18,15 @@
       <div data-testid="empty" class="empty" style="display: none;">No incidents tonight</div>
       <ul data-testid="incident-list" class="list" style="display: none;"></ul>
     </main>
-    <footer>sched-prod incident board · <span data-testid="build-sha">9c0566a</span></footer>
+    <div data-testid="confirm" id="confirm-modal" class="confirm-modal" style="display: none;">
+      <div class="confirm-content">
+        <p id="confirm-message">Acknowledge incident?</p>
+        <div class="confirm-buttons">
+          <button data-testid="confirm-ack" id="confirm-ack-btn" class="confirm-ack-btn">Ack</button>
+          <button data-testid="confirm-cancel" id="confirm-cancel-btn" class="confirm-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <footer>sched-prod incident board · <span data-testid="build-sha">BUILD_SHA_PLACEHOLDER</span></footer>
   </body>
 </html>
