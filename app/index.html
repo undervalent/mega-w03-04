@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="build" content="BUILD_SHA_PLACEHOLDER" />
+    <title>sched-prod · incidents</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>incidents</h1>
+      <p class="sub">sched-prod · tonight</p>
+    </header>
+    <main data-testid="board">
+      <div data-testid="loader" class="loader">Loading incidents…</div>
+      <div data-testid="empty" class="empty" style="display: none;">No incidents tonight</div>
+      <ul data-testid="incident-list" class="list" style="display: none;"></ul>
+    </main>
+    <footer>sched-prod incident board · <span data-testid="build-sha">BUILD_SHA_PLACEHOLDER</span></footer>
+  </body>
+</html>
